@@ -101,7 +101,6 @@ export interface MappingFile {
 export interface SyncConfig {
   githubToken: string;
   beadsFile: string;
-  mappingFile: string;
   dryRun: boolean;
   syncComments: boolean;
   syncStatuses: BeadsStatus[];
@@ -110,8 +109,6 @@ export interface SyncConfig {
   labelPrefix: string;
   addSyncMarker: boolean;
   closeDeleted: boolean;
-  autoCommitMapping: boolean;
-  commitMessage: string;
   owner: string;
   repo: string;
 }
@@ -210,3 +207,31 @@ export const BLOCKED_LABEL: LabelConfig = {
   color: 'd93f0b',
   description: 'Issue has open blockers',
 };
+
+export const IN_PROGRESS_LABEL: LabelConfig = {
+  name: 'beads-in-progress',
+  color: 'fbca04',
+  description: 'Issue is in progress',
+};
+
+/**
+ * Prefix for beads ID labels
+ */
+export const BEADS_ID_LABEL_PREFIX = 'beads-id:';
+
+/**
+ * In-memory mapping of beads ID to GitHub issue
+ */
+export interface IssueMappingEntry {
+  githubIssueNumber: number;
+  githubIssueId: number;
+  beadsId: string;
+}
+
+/**
+ * In-memory mapping built from GitHub issues
+ */
+export interface IssueMap {
+  byBeadsId: Map<string, IssueMappingEntry>;
+  byGitHubNumber: Map<number, IssueMappingEntry>;
+}

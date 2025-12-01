@@ -14,10 +14,6 @@ inputs:
     description: 'Path to beads issues.jsonl file'
     required: false
     default: 'beads/issues.jsonl'
-  mapping-file:
-    description: 'Path to mapping file'
-    required: false
-    default: '.beads-sync/mapping.json'
   dry-run:
     description: 'Preview changes without applying'
     required: false
@@ -50,14 +46,6 @@ inputs:
     description: 'Close GitHub issues when beads issue is deleted'
     required: false
     default: 'true'
-  auto-commit-mapping:
-    description: 'Commit mapping file changes automatically'
-    required: false
-    default: 'true'
-  commit-message:
-    description: 'Commit message for mapping file updates'
-    required: false
-    default: 'chore(beads-sync): update issue mapping'
 
 outputs:
   created:

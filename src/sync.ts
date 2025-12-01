@@ -104,6 +104,13 @@ async function executeAction(
         );
 
         core.info(`Created issue #${created.number}: ${beadsIssue.title}`);
+
+        // If the beads issue is already closed, close the GitHub issue too
+        if (beadsIssue.status === 'closed') {
+          const closingComment = generateClosingComment(beadsIssue);
+          await client.closeIssue(created.number, closingComment);
+          core.info(`Closed issue #${created.number} (beads status: closed)`);
+        }
         break;
       }
 
@@ -210,6 +217,13 @@ async function executeAction(
         core.info(
           `Adopted issue #${action.githubIssueNumber} for ${beadsIssue.id}`
         );
+
+        // If the beads issue is closed, close the GitHub issue too
+        if (beadsIssue.status === 'closed') {
+          const closingComment = generateClosingComment(beadsIssue);
+          await client.closeIssue(action.githubIssueNumber!, closingComment);
+          core.info(`Closed adopted issue #${action.githubIssueNumber} (beads status: closed)`);
+        }
         break;
       }
 

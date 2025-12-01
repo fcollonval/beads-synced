@@ -30,6 +30,7 @@ export interface GitHubIssue {
   state: 'open' | 'closed';
   title: string;
   body: string | null;
+  labels: string[];
 }
 
 /**
@@ -65,6 +66,9 @@ export class GitHubClient {
       state: response.data.state as 'open' | 'closed',
       title: response.data.title,
       body: response.data.body ?? null,
+      labels: response.data.labels.map((l) =>
+        typeof l === 'string' ? l : l.name ?? ''
+      ),
     };
   }
 
@@ -89,6 +93,9 @@ export class GitHubClient {
       state: response.data.state as 'open' | 'closed',
       title: response.data.title,
       body: response.data.body ?? null,
+      labels: response.data.labels.map((l) =>
+        typeof l === 'string' ? l : l.name ?? ''
+      ),
     };
   }
 
@@ -109,6 +116,9 @@ export class GitHubClient {
         state: response.data.state as 'open' | 'closed',
         title: response.data.title,
         body: response.data.body ?? null,
+        labels: response.data.labels.map((l) =>
+          typeof l === 'string' ? l : l.name ?? ''
+        ),
       };
     } catch (error) {
       if ((error as { status?: number }).status === 404) {
@@ -230,5 +240,44 @@ export class GitHubClient {
     }
 
     return validAssignees;
+  }
+
+  /**
+   * List all issues with a specific label (paginated)
+   * Returns both open and closed issues
+   */
+  async listIssuesByLabel(labelName: string): Promise<GitHubIssue[]> {
+    const issues: GitHubIssue[] = [];
+
+    // Fetch open issues
+    for await (const response of this.octokit.paginate.iterator(
+      this.octokit.issues.listForRepo,
+      {
+        owner: this.owner,
+        repo: this.repo,
+        labels: labelName,
+        state: 'all',
+        per_page: 100,
+      }
+    )) {
+      for (const issue of response.data) {
+        // Skip pull requests (they're returned by the issues API)
+        if (issue.pull_request) {
+          continue;
+        }
+        issues.push({
+          number: issue.number,
+          id: issue.id,
+          state: issue.state as 'open' | 'closed',
+          title: issue.title,
+          body: issue.body ?? null,
+          labels: issue.labels.map((l) =>
+            typeof l === 'string' ? l : l.name ?? ''
+          ),
+        });
+      }
+    }
+
+    return issues;
   }
 }

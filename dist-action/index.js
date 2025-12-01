@@ -267,6 +267,7 @@ class GitHubClient {
             state: response.data.state,
             title: response.data.title,
             body: response.data.body ?? null,
+            labels: response.data.labels.map((l) => typeof l === 'string' ? l : l.name ?? ''),
         };
     }
     /**
@@ -289,6 +290,7 @@ class GitHubClient {
             state: response.data.state,
             title: response.data.title,
             body: response.data.body ?? null,
+            labels: response.data.labels.map((l) => typeof l === 'string' ? l : l.name ?? ''),
         };
     }
     /**
@@ -307,6 +309,7 @@ class GitHubClient {
                 state: response.data.state,
                 title: response.data.title,
                 body: response.data.body ?? null,
+                labels: response.data.labels.map((l) => typeof l === 'string' ? l : l.name ?? ''),
             };
         }
         catch (error) {
@@ -417,6 +420,37 @@ class GitHubClient {
         }
         return validAssignees;
     }
+    /**
+     * List all issues with a specific label (paginated)
+     * Returns both open and closed issues
+     */
+    async listIssuesByLabel(labelName) {
+        const issues = [];
+        // Fetch open issues
+        for await (const response of this.octokit.paginate.iterator(this.octokit.issues.listForRepo, {
+            owner: this.owner,
+            repo: this.repo,
+            labels: labelName,
+            state: 'all',
+            per_page: 100,
+        })) {
+            for (const issue of response.data) {
+                // Skip pull requests (they're returned by the issues API)
+                if (issue.pull_request) {
+                    continue;
+                }
+                issues.push({
+                    number: issue.number,
+                    id: issue.id,
+                    state: issue.state,
+                    title: issue.title,
+                    body: issue.body ?? null,
+                    labels: issue.labels.map((l) => typeof l === 'string' ? l : l.name ?? ''),
+                });
+            }
+        }
+        return issues;
+    }
 }
 exports.GitHubClient = GitHubClient;
 //# sourceMappingURL=github.js.map
@@ -465,7 +499,7 @@ Object.defineProperty(exports, "__esModule", ({ value: true }));
 const core = __importStar(__nccwpck_require__(7484));
 const github = __importStar(__nccwpck_require__(3228));
 const fs = __importStar(__nccwpck_require__(9896));
-const path = __importStar(__nccwpck_require__(6928));
+const types_1 = __nccwpck_require__(920);
 const parser_1 = __nccwpck_require__(4262);
 const mapper_1 = __nccwpck_require__(2752);
 const github_1 = __nccwpck_require__(5442);
@@ -491,7 +525,6 @@ function getConfig() {
     return {
         githubToken: core.getInput('github-token', { required: true }),
         beadsFile: core.getInput('beads-file') || 'beads/issues.jsonl',
-        mappingFile: core.getInput('mapping-file') || '.beads-sync/mapping.json',
         dryRun: core.getInput('dry-run') === 'true',
         syncComments: core.getInput('sync-comments') !== 'false',
         syncStatuses,
@@ -500,9 +533,6 @@ function getConfig() {
         labelPrefix: core.getInput('label-prefix') || '',
         addSyncMarker: core.getInput('add-sync-marker') !== 'false',
         closeDeleted: core.getInput('close-deleted') !== 'false',
-        autoCommitMapping: core.getInput('auto-commit-mapping') !== 'false',
-        commitMessage: core.getInput('commit-message') ||
-            'chore(beads-sync): update issue mapping',
         owner,
         repo,
     };
@@ -519,15 +549,6 @@ function readFileOrEmpty(filePath) {
     }
 }
 /**
- * Ensure directory exists for a file path
- */
-function ensureDir(filePath) {
-    const dir = path.dirname(filePath);
-    if (!fs.existsSync(dir)) {
-        fs.mkdirSync(dir, { recursive: true });
-    }
-}
-/**
  * Main action entry point
  */
 async function run() {
@@ -536,7 +557,6 @@ async function run() {
         core.info(`Beads Syncer starting...`);
         core.info(`Repository: ${config.owner}/${config.repo}`);
         core.info(`Beads file: ${config.beadsFile}`);
-        core.info(`Mapping file: ${config.mappingFile}`);
         if (config.dryRun) {
             core.info('DRY RUN MODE - no changes will be made');
         }
@@ -560,23 +580,22 @@ async function run() {
             core.info('No valid issues to sync');
             return;
         }
-        // Read mapping file
-        const mappingContent = readFileOrEmpty(config.mappingFile);
-        const mapping = (0, mapper_1.deserializeMapping)(mappingContent);
         // Create GitHub client
         const client = new github_1.GitHubClient({
             token: config.githubToken,
             owner: config.owner,
             repo: config.repo,
         });
+        // Build mapping from existing GitHub issues
+        // This replaces the file-based mapping with a dynamic approach
+        const syncMarkerLabel = `${config.labelPrefix}${types_1.SYNC_MARKER_LABEL.name}`;
+        core.info(`Fetching existing synced issues with label: ${syncMarkerLabel}`);
+        const existingIssues = await client.listIssuesByLabel(syncMarkerLabel);
+        core.info(`Found ${existingIssues.length} existing synced issues`);
+        const mapping = (0, mapper_1.buildMappingFromGitHubIssues)(existingIssues, config.labelPrefix);
+        core.info(`Built mapping with ${Object.keys(mapping.mappings).length} entries`);
         // Run sync
         const result = await (0, sync_1.runSync)(parseResult.issues, mapping, client, config);
-        // Save mapping file
-        if (!config.dryRun) {
-            ensureDir(config.mappingFile);
-            fs.writeFileSync(config.mappingFile, (0, mapper_1.serializeMapping)(mapping));
-            core.info(`Saved mapping file: ${config.mappingFile}`);
-        }
         // Set outputs
         core.setOutput('created', result.created.toString());
         core.setOutput('updated', result.updated.toString());
@@ -618,6 +637,9 @@ exports.getLabelsForIssue = getLabelsForIssue;
 exports.getAllRequiredLabels = getAllRequiredLabels;
 exports.getEpicLabel = getEpicLabel;
 exports.createEpicLabelConfig = createEpicLabelConfig;
+exports.getBeadsIdLabel = getBeadsIdLabel;
+exports.parseBeadsIdFromLabel = parseBeadsIdFromLabel;
+exports.extractBeadsIdFromLabels = extractBeadsIdFromLabels;
 const types_1 = __nccwpck_require__(920);
 /**
  * Get all labels that should be applied to a GitHub issue
@@ -629,6 +651,8 @@ function getLabelsForIssue(issue, options) {
     if (options.addSyncMarker) {
         labels.push(`${prefix}${types_1.SYNC_MARKER_LABEL.name}`);
     }
+    // Beads ID label - always add to track the mapping
+    labels.push(getBeadsIdLabel(issue.id, prefix));
     // Priority label
     if (issue.priority !== undefined) {
         const priorityLabel = types_1.PRIORITY_LABELS[issue.priority];
@@ -643,9 +667,12 @@ function getLabelsForIssue(issue, options) {
             labels.push(`${prefix}${typeLabel.name}`);
         }
     }
-    // Blocked status
+    // Status labels
     if (issue.status === 'blocked') {
         labels.push(`${prefix}${types_1.BLOCKED_LABEL.name}`);
+    }
+    else if (issue.status === 'in_progress') {
+        labels.push(`${prefix}${types_1.IN_PROGRESS_LABEL.name}`);
     }
     // Custom labels from beads
     if (issue.labels) {
@@ -689,6 +716,10 @@ function getAllRequiredLabels(prefix = '') {
         ...types_1.BLOCKED_LABEL,
         name: `${prefix}${types_1.BLOCKED_LABEL.name}`,
     });
+    labels.push({
+        ...types_1.IN_PROGRESS_LABEL,
+        name: `${prefix}${types_1.IN_PROGRESS_LABEL.name}`,
+    });
     return labels;
 }
 /**
@@ -707,17 +738,48 @@ function createEpicLabelConfig(parentBeadsId, prefix = '') {
         description: `Child of epic ${parentBeadsId}`,
     };
 }
+/**
+ * Generate the beads ID label for an issue
+ */
+function getBeadsIdLabel(beadsId, prefix = '') {
+    return `${prefix}${types_1.BEADS_ID_LABEL_PREFIX}${beadsId}`;
+}
+/**
+ * Extract the beads ID from a label name
+ * Returns null if the label is not a beads ID label
+ */
+function parseBeadsIdFromLabel(labelName, prefix = '') {
+    const fullPrefix = `${prefix}${types_1.BEADS_ID_LABEL_PREFIX}`;
+    if (labelName.startsWith(fullPrefix)) {
+        return labelName.slice(fullPrefix.length);
+    }
+    return null;
+}
+/**
+ * Extract the beads ID from an array of label names
+ * Returns null if no beads ID label is found
+ */
+function extractBeadsIdFromLabels(labels, prefix = '') {
+    for (const label of labels) {
+        const beadsId = parseBeadsIdFromLabel(label, prefix);
+        if (beadsId) {
+            return beadsId;
+        }
+    }
+    return null;
+}
 //# sourceMappingURL=labels.js.map
 
 /***/ }),
 
 /***/ 2752:
-/***/ ((__unused_webpack_module, exports) => {
+/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
 
 "use strict";
 
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.createEmptyMapping = createEmptyMapping;
+exports.buildMappingFromGitHubIssues = buildMappingFromGitHubIssues;
 exports.getMapping = getMapping;
 exports.setMapping = setMapping;
 exports.removeMapping = removeMapping;
@@ -728,6 +790,7 @@ exports.deserializeMapping = deserializeMapping;
 exports.getMappedBeadsIds = getMappedBeadsIds;
 exports.updateLastSyncTime = updateLastSyncTime;
 exports.createIssueMapping = createIssueMapping;
+const labels_1 = __nccwpck_require__(9754);
 /**
  * Create a new empty mapping file structure
  */
@@ -739,6 +802,29 @@ function createEmptyMapping() {
             last_full_sync: new Date().toISOString(),
         },
     };
+}
+/**
+ * Build a mapping from GitHub issues by extracting beads IDs from labels
+ * This replaces the need for a persistent mapping file
+ */
+function buildMappingFromGitHubIssues(issues, labelPrefix = '') {
+    const mapping = createEmptyMapping();
+    for (const issue of issues) {
+        const beadsId = (0, labels_1.extractBeadsIdFromLabels)(issue.labels, labelPrefix);
+        if (beadsId) {
+            mapping.mappings[beadsId] = {
+                github_issue_number: issue.number,
+                github_issue_id: issue.id,
+                last_sync_at: new Date().toISOString(),
+                // We don't know when it was last updated, so use epoch
+                // This will cause an update on first sync which is fine
+                beads_updated_at: '1970-01-01T00:00:00Z',
+                adopted_from_external_ref: false,
+                comments: {},
+            };
+        }
+    }
+    return mapping;
 }
 /**
  * Get the mapping for a beads issue ID
@@ -1019,6 +1105,12 @@ async function executeAction(action, mapping, client, config) {
                 });
                 (0, mapper_1.setMapping)(mapping, beadsIssue.id, (0, mapper_1.createIssueMapping)(created.number, created.id, beadsIssue.updated_at));
                 core.info(`Created issue #${created.number}: ${beadsIssue.title}`);
+                // If the beads issue is already closed, close the GitHub issue too
+                if (beadsIssue.status === 'closed') {
+                    const closingComment = (0, template_1.generateClosingComment)(beadsIssue);
+                    await client.closeIssue(created.number, closingComment);
+                    core.info(`Closed issue #${created.number} (beads status: closed)`);
+                }
                 break;
             }
             case 'update': {
@@ -1091,6 +1183,12 @@ async function executeAction(action, mapping, client, config) {
                 (0, mapper_1.setMapping)(mapping, beadsIssue.id, (0, mapper_1.createIssueMapping)(existingIssue.number, existingIssue.id, beadsIssue.updated_at, true // adopted_from_external_ref
                 ));
                 core.info(`Adopted issue #${action.githubIssueNumber} for ${beadsIssue.id}`);
+                // If the beads issue is closed, close the GitHub issue too
+                if (beadsIssue.status === 'closed') {
+                    const closingComment = (0, template_1.generateClosingComment)(beadsIssue);
+                    await client.closeIssue(action.githubIssueNumber, closingComment);
+                    core.info(`Closed adopted issue #${action.githubIssueNumber} (beads status: closed)`);
+                }
                 break;
             }
             case 'reopen': {
@@ -1380,7 +1478,7 @@ ${comment.body}
 "use strict";
 
 Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.BLOCKED_LABEL = exports.SYNC_MARKER_LABEL = exports.TYPE_LABELS = exports.PRIORITY_LABELS = void 0;
+exports.BEADS_ID_LABEL_PREFIX = exports.IN_PROGRESS_LABEL = exports.BLOCKED_LABEL = exports.SYNC_MARKER_LABEL = exports.TYPE_LABELS = exports.PRIORITY_LABELS = void 0;
 /**
  * Default label configurations
  */
@@ -1408,6 +1506,15 @@ exports.BLOCKED_LABEL = {
     color: 'd93f0b',
     description: 'Issue has open blockers',
 };
+exports.IN_PROGRESS_LABEL = {
+    name: 'beads-in-progress',
+    color: 'fbca04',
+    description: 'Issue is in progress',
+};
+/**
+ * Prefix for beads ID labels
+ */
+exports.BEADS_ID_LABEL_PREFIX = 'beads-id:';
 //# sourceMappingURL=types.js.map
 
 /***/ }),

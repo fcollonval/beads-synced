@@ -7,6 +7,8 @@ import {
   TYPE_LABELS,
   SYNC_MARKER_LABEL,
   BLOCKED_LABEL,
+  IN_PROGRESS_LABEL,
+  BEADS_ID_LABEL_PREFIX,
 } from './types';
 
 export interface LabelOptions {
@@ -29,6 +31,9 @@ export function getLabelsForIssue(
     labels.push(`${prefix}${SYNC_MARKER_LABEL.name}`);
   }
 
+  // Beads ID label - always add to track the mapping
+  labels.push(getBeadsIdLabel(issue.id, prefix));
+
   // Priority label
   if (issue.priority !== undefined) {
     const priorityLabel = PRIORITY_LABELS[issue.priority as BeadsPriority];
@@ -45,9 +50,11 @@ export function getLabelsForIssue(
     }
   }
 
-  // Blocked status
+  // Status labels
   if (issue.status === 'blocked') {
     labels.push(`${prefix}${BLOCKED_LABEL.name}`);
+  } else if (issue.status === 'in_progress') {
+    labels.push(`${prefix}${IN_PROGRESS_LABEL.name}`);
   }
 
   // Custom labels from beads
@@ -98,6 +105,10 @@ export function getAllRequiredLabels(prefix: string = ''): LabelConfig[] {
     ...BLOCKED_LABEL,
     name: `${prefix}${BLOCKED_LABEL.name}`,
   });
+  labels.push({
+    ...IN_PROGRESS_LABEL,
+    name: `${prefix}${IN_PROGRESS_LABEL.name}`,
+  });
 
   return labels;
 }
@@ -121,4 +132,43 @@ export function createEpicLabelConfig(
     color: '5319e7',
     description: `Child of epic ${parentBeadsId}`,
   };
+}
+
+/**
+ * Generate the beads ID label for an issue
+ */
+export function getBeadsIdLabel(beadsId: string, prefix: string = ''): string {
+  return `${prefix}${BEADS_ID_LABEL_PREFIX}${beadsId}`;
+}
+
+/**
+ * Extract the beads ID from a label name
+ * Returns null if the label is not a beads ID label
+ */
+export function parseBeadsIdFromLabel(
+  labelName: string,
+  prefix: string = ''
+): string | null {
+  const fullPrefix = `${prefix}${BEADS_ID_LABEL_PREFIX}`;
+  if (labelName.startsWith(fullPrefix)) {
+    return labelName.slice(fullPrefix.length);
+  }
+  return null;
+}
+
+/**
+ * Extract the beads ID from an array of label names
+ * Returns null if no beads ID label is found
+ */
+export function extractBeadsIdFromLabels(
+  labels: string[],
+  prefix: string = ''
+): string | null {
+  for (const label of labels) {
+    const beadsId = parseBeadsIdFromLabel(label, prefix);
+    if (beadsId) {
+      return beadsId;
+    }
+  }
+  return null;
 }

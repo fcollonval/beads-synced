@@ -3,6 +3,9 @@ import {
   getLabelsForIssue,
   getAllRequiredLabels,
   getEpicLabel,
+  getBeadsIdLabel,
+  parseBeadsIdFromLabel,
+  extractBeadsIdFromLabels,
 } from '../src/labels';
 import { BeadsIssue } from '../src/types';
 
@@ -50,6 +53,32 @@ describe('labels', () => {
       const labels = getLabelsForIssue(issue, { addSyncMarker: false });
 
       expect(labels).toContain('beads-blocked');
+    });
+
+    it('should include beads-in-progress label when status is in_progress', () => {
+      const issue: BeadsIssue = { ...baseIssue, status: 'in_progress' };
+
+      const labels = getLabelsForIssue(issue, { addSyncMarker: false });
+
+      expect(labels).toContain('beads-in-progress');
+    });
+
+    it('should not include status label when status is open', () => {
+      const issue: BeadsIssue = { ...baseIssue, status: 'open' };
+
+      const labels = getLabelsForIssue(issue, { addSyncMarker: false });
+
+      expect(labels).not.toContain('beads-blocked');
+      expect(labels).not.toContain('beads-in-progress');
+    });
+
+    it('should not include status label when status is closed', () => {
+      const issue: BeadsIssue = { ...baseIssue, status: 'closed' };
+
+      const labels = getLabelsForIssue(issue, { addSyncMarker: false });
+
+      expect(labels).not.toContain('beads-blocked');
+      expect(labels).not.toContain('beads-in-progress');
     });
 
     it('should include custom labels from beads issue', () => {
@@ -140,6 +169,9 @@ describe('labels', () => {
       expect(labels).toContainEqual(
         expect.objectContaining({ name: 'beads-blocked' })
       );
+      expect(labels).toContainEqual(
+        expect.objectContaining({ name: 'beads-in-progress' })
+      );
     });
 
     it('should apply prefix to all labels when configured', () => {
@@ -156,6 +188,73 @@ describe('labels', () => {
 
     it('should apply prefix when configured', () => {
       expect(getEpicLabel('bd-abc123', 'beads-')).toBe('beads-epic:bd-abc123');
+    });
+  });
+
+  describe('getBeadsIdLabel', () => {
+    it('should generate beads ID label', () => {
+      expect(getBeadsIdLabel('bd-abc123')).toBe('beads-id:bd-abc123');
+    });
+
+    it('should apply prefix when configured', () => {
+      expect(getBeadsIdLabel('bd-abc123', 'myprefix-')).toBe('myprefix-beads-id:bd-abc123');
+    });
+  });
+
+  describe('parseBeadsIdFromLabel', () => {
+    it('should extract beads ID from label', () => {
+      expect(parseBeadsIdFromLabel('beads-id:bd-abc123')).toBe('bd-abc123');
+    });
+
+    it('should extract beads ID with prefix', () => {
+      expect(parseBeadsIdFromLabel('myprefix-beads-id:bd-abc123', 'myprefix-')).toBe('bd-abc123');
+    });
+
+    it('should return null for non-beads-id labels', () => {
+      expect(parseBeadsIdFromLabel('type:bug')).toBeNull();
+      expect(parseBeadsIdFromLabel('beads-synced')).toBeNull();
+      expect(parseBeadsIdFromLabel('priority:p1')).toBeNull();
+    });
+
+    it('should return null when prefix does not match', () => {
+      expect(parseBeadsIdFromLabel('beads-id:bd-abc123', 'wrong-')).toBeNull();
+    });
+  });
+
+  describe('extractBeadsIdFromLabels', () => {
+    it('should find beads ID in array of labels', () => {
+      const labels = ['type:bug', 'beads-synced', 'beads-id:bd-test123', 'priority:p1'];
+      expect(extractBeadsIdFromLabels(labels)).toBe('bd-test123');
+    });
+
+    it('should return null if no beads ID label exists', () => {
+      const labels = ['type:bug', 'beads-synced', 'priority:p1'];
+      expect(extractBeadsIdFromLabels(labels)).toBeNull();
+    });
+
+    it('should handle prefix correctly', () => {
+      const labels = ['myprefix-type:bug', 'myprefix-beads-id:bd-xyz', 'myprefix-beads-synced'];
+      expect(extractBeadsIdFromLabels(labels, 'myprefix-')).toBe('bd-xyz');
+    });
+
+    it('should return first beads ID if multiple exist', () => {
+      const labels = ['beads-id:bd-first', 'beads-id:bd-second'];
+      expect(extractBeadsIdFromLabels(labels)).toBe('bd-first');
+    });
+  });
+
+  describe('getLabelsForIssue - beads ID label', () => {
+    it('should always include beads ID label', () => {
+      const labels = getLabelsForIssue(baseIssue, { addSyncMarker: false });
+      expect(labels).toContain('beads-id:bd-test');
+    });
+
+    it('should include beads ID label with prefix', () => {
+      const labels = getLabelsForIssue(baseIssue, {
+        addSyncMarker: false,
+        labelPrefix: 'myprefix-',
+      });
+      expect(labels).toContain('myprefix-beads-id:bd-test');
     });
   });
 });

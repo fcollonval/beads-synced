@@ -1,4 +1,6 @@
 import { MappingFile, IssueMapping } from './types';
+import { GitHubIssue } from './github';
+import { extractBeadsIdFromLabels } from './labels';
 
 /**
  * Create a new empty mapping file structure
@@ -11,6 +13,35 @@ export function createEmptyMapping(): MappingFile {
       last_full_sync: new Date().toISOString(),
     },
   };
+}
+
+/**
+ * Build a mapping from GitHub issues by extracting beads IDs from labels
+ * This replaces the need for a persistent mapping file
+ */
+export function buildMappingFromGitHubIssues(
+  issues: GitHubIssue[],
+  labelPrefix: string = ''
+): MappingFile {
+  const mapping = createEmptyMapping();
+
+  for (const issue of issues) {
+    const beadsId = extractBeadsIdFromLabels(issue.labels, labelPrefix);
+    if (beadsId) {
+      mapping.mappings[beadsId] = {
+        github_issue_number: issue.number,
+        github_issue_id: issue.id,
+        last_sync_at: new Date().toISOString(),
+        // We don't know when it was last updated, so use epoch
+        // This will cause an update on first sync which is fine
+        beads_updated_at: '1970-01-01T00:00:00Z',
+        adopted_from_external_ref: false,
+        comments: {},
+      };
+    }
+  }
+
+  return mapping;
 }
 
 /**

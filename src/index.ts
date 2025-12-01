@@ -1,11 +1,10 @@
 import * as core from '@actions/core';
 import * as github from '@actions/github';
 import * as fs from 'fs';
-import * as path from 'path';
 
-import { SyncConfig, BeadsStatus, BeadsPriority } from './types';
+import { SyncConfig, BeadsStatus, BeadsPriority, SYNC_MARKER_LABEL } from './types';
 import { parseBeadsFile } from './parser';
-import { deserializeMapping, serializeMapping } from './mapper';
+import { buildMappingFromGitHubIssues } from './mapper';
 import { GitHubClient } from './github';
 import { runSync } from './sync';
 
@@ -34,7 +33,6 @@ function getConfig(): SyncConfig {
   return {
     githubToken: core.getInput('github-token', { required: true }),
     beadsFile: core.getInput('beads-file') || 'beads/issues.jsonl',
-    mappingFile: core.getInput('mapping-file') || '.beads-sync/mapping.json',
     dryRun: core.getInput('dry-run') === 'true',
     syncComments: core.getInput('sync-comments') !== 'false',
     syncStatuses,
@@ -43,10 +41,6 @@ function getConfig(): SyncConfig {
     labelPrefix: core.getInput('label-prefix') || '',
     addSyncMarker: core.getInput('add-sync-marker') !== 'false',
     closeDeleted: core.getInput('close-deleted') !== 'false',
-    autoCommitMapping: core.getInput('auto-commit-mapping') !== 'false',
-    commitMessage:
-      core.getInput('commit-message') ||
-      'chore(beads-sync): update issue mapping',
     owner,
     repo,
   };
@@ -64,16 +58,6 @@ function readFileOrEmpty(filePath: string): string {
 }
 
 /**
- * Ensure directory exists for a file path
- */
-function ensureDir(filePath: string): void {
-  const dir = path.dirname(filePath);
-  if (!fs.existsSync(dir)) {
-    fs.mkdirSync(dir, { recursive: true });
-  }
-}
-
-/**
  * Main action entry point
  */
 async function run(): Promise<void> {
@@ -83,7 +67,6 @@ async function run(): Promise<void> {
     core.info(`Beads Syncer starting...`);
     core.info(`Repository: ${config.owner}/${config.repo}`);
     core.info(`Beads file: ${config.beadsFile}`);
-    core.info(`Mapping file: ${config.mappingFile}`);
     if (config.dryRun) {
       core.info('DRY RUN MODE - no changes will be made');
     }
@@ -112,10 +95,6 @@ async function run(): Promise<void> {
       return;
     }
 
-    // Read mapping file
-    const mappingContent = readFileOrEmpty(config.mappingFile);
-    const mapping = deserializeMapping(mappingContent);
-
     // Create GitHub client
     const client = new GitHubClient({
       token: config.githubToken,
@@ -123,15 +102,18 @@ async function run(): Promise<void> {
       repo: config.repo,
     });
 
+    // Build mapping from existing GitHub issues
+    // This replaces the file-based mapping with a dynamic approach
+    const syncMarkerLabel = `${config.labelPrefix}${SYNC_MARKER_LABEL.name}`;
+    core.info(`Fetching existing synced issues with label: ${syncMarkerLabel}`);
+    const existingIssues = await client.listIssuesByLabel(syncMarkerLabel);
+    core.info(`Found ${existingIssues.length} existing synced issues`);
+
+    const mapping = buildMappingFromGitHubIssues(existingIssues, config.labelPrefix);
+    core.info(`Built mapping with ${Object.keys(mapping.mappings).length} entries`);
+
     // Run sync
     const result = await runSync(parseResult.issues, mapping, client, config);
-
-    // Save mapping file
-    if (!config.dryRun) {
-      ensureDir(config.mappingFile);
-      fs.writeFileSync(config.mappingFile, serializeMapping(mapping));
-      core.info(`Saved mapping file: ${config.mappingFile}`);
-    }
 
     // Set outputs
     core.setOutput('created', result.created.toString());
