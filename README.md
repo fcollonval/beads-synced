@@ -35,7 +35,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: mrf/beads-syncer@v1
+      - uses: mrf/beads-synced@v1
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
 ```
