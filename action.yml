@@ -1,0 +1,74 @@
+name: 'Beads to GitHub Issues Sync'
+description: 'Syncs issues from beads issue tracking system to GitHub Issues'
+author: 'Your Name'
+
+branding:
+  icon: 'refresh-cw'
+  color: 'blue'
+
+inputs:
+  github-token:
+    description: 'GitHub token for API access'
+    required: true
+  beads-file:
+    description: 'Path to beads issues.jsonl file'
+    required: false
+    default: 'beads/issues.jsonl'
+  mapping-file:
+    description: 'Path to mapping file'
+    required: false
+    default: '.beads-sync/mapping.json'
+  dry-run:
+    description: 'Preview changes without applying'
+    required: false
+    default: 'false'
+  sync-comments:
+    description: 'Sync beads comments to GitHub issue comments'
+    required: false
+    default: 'true'
+  sync-statuses:
+    description: 'Comma-separated list of statuses to sync'
+    required: false
+    default: 'open,in_progress,blocked,closed'
+  sync-priorities:
+    description: 'Comma-separated list of priorities to sync'
+    required: false
+    default: '0,1,2,3,4'
+  sync-labels:
+    description: 'Filter by beads labels (comma-separated)'
+    required: false
+    default: ''
+  label-prefix:
+    description: 'Prefix for auto-created labels'
+    required: false
+    default: ''
+  add-sync-marker:
+    description: 'Add beads-synced label to synced issues'
+    required: false
+    default: 'true'
+  close-deleted:
+    description: 'Close GitHub issues when beads issue is deleted'
+    required: false
+    default: 'true'
+  auto-commit-mapping:
+    description: 'Commit mapping file changes automatically'
+    required: false
+    default: 'true'
+  commit-message:
+    description: 'Commit message for mapping file updates'
+    required: false
+    default: 'chore(beads-sync): update issue mapping'
+
+outputs:
+  created:
+    description: 'Number of issues created'
+  updated:
+    description: 'Number of issues updated'
+  closed:
+    description: 'Number of issues closed'
+  comments-synced:
+    description: 'Number of comments synced'
+
+runs:
+  using: 'node20'
+  main: 'dist-action/index.js'
