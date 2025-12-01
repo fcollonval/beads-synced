@@ -113,6 +113,29 @@ describe('template', () => {
       expect(body).toContain('bd-unmapped (relates-to)');
     });
 
+    it('should fall back to beads ID when mapping has undefined github_issue_number', () => {
+      const mapping = createEmptyMapping();
+      // Simulate corrupted mapping with undefined github_issue_number
+      mapping.mappings['bd-dep1'] = {
+        github_issue_number: undefined as unknown as number,
+        github_issue_id: 100,
+        last_sync_at: '2025-01-01T00:00:00Z',
+        beads_updated_at: '2025-01-01T00:00:00Z',
+        adopted_from_external_ref: false,
+      };
+
+      const issue: BeadsIssue = {
+        ...minimalIssue,
+        dependencies: [{ id: 'bd-dep1', type: 'blocks' }],
+      };
+
+      const body = generateIssueBody(issue, mapping);
+
+      expect(body).toContain('**Dependencies**');
+      expect(body).toContain('bd-dep1 (blocks)');
+      expect(body).not.toContain('undefined');
+    });
+
     it('should not include sections for missing optional fields', () => {
       const body = generateIssueBody(minimalIssue, createEmptyMapping());
 

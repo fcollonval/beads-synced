@@ -66,7 +66,7 @@ ${issue.notes}
   if (issue.dependencies && issue.dependencies.length > 0) {
     const depStrings = issue.dependencies.map((dep) => {
       const depMapping = getMapping(mapping, dep.id);
-      if (depMapping) {
+      if (depMapping?.github_issue_number !== undefined) {
         return `#${depMapping.github_issue_number} (${dep.type})`;
       }
       return `${dep.id} (${dep.type})`;
