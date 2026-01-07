@@ -135,6 +135,18 @@ async function run(): Promise<void> {
     core.info(`Adopted: ${result.adopted}`);
     core.info(`Comments synced: ${result.commentsSynced}`);
 
+    await core.summary
+      .addHeading('Beads Issues Synchronization Summary')
+      .addTable([
+        ['Created:', `${result.created}`],
+        ['Updated:', `${result.updated}`],
+        ['Closed:', `${result.closed}`],
+        ['Reopened:', `${result.reopened}`],
+        ['Adopted:', `${result.adopted}`],
+        ['Comments synced:', `${result.commentsSynced}`]
+      ])
+      .write()
+
     if (result.errors.length > 0) {
       core.warning(`Errors: ${result.errors.length}`);
       for (const err of result.errors) {
