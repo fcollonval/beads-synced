@@ -2,7 +2,7 @@
 
 ## Overview
 
-A GitHub Action that syncs issues from the [beads](https://github.com/steveyegge/beads) issue tracking system (stored in `beads/issues.jsonl`) to GitHub Issues. This is a **one-way sync** where beads is the source of truth and GitHub Issues serves as a read-only mirror.
+A GitHub Action that syncs issues from the [beads](https://github.com/steveyegge/beads) issue tracking system (stored in `.beads/issues.jsonl`) to GitHub Issues. This is a **one-way sync** where beads is the source of truth and GitHub Issues serves as a read-only mirror.
 
 ## Goals
 
@@ -19,15 +19,15 @@ A GitHub Action that syncs issues from the [beads](https://github.com/steveyegge
 │                        GitHub Repository                            │
 ├─────────────────────────────────────────────────────────────────────┤
 │                                                                     │
-│  beads/issues.jsonl        .beads-sync/mapping.json                │
-│  (Source of truth for      (Beads ID ↔ GitHub Issue #              │
-│   beads issues)             mapping table)                          │
+│                        beads/issues.jsonl                           │
+│                        (Source of truth for                         │
+│                         beads issues)                               │
 │                                                                     │
 └──────────────┬──────────────────────────────────┬───────────────────┘
                │                                  │
                ▼                                  ▼
 ┌──────────────────────────┐      ┌──────────────────────────────────┐
-│   GitHub Action Trigger   │      │     GitHub Issues API            │
+│   GitHub Action Trigger  │      │     GitHub Issues API            │
 │   - push to main         │      │     - Create issues              │
 │   - workflow_dispatch    │      │     - Update issues              │
 │   - schedule (cron)      │      │     - Close issues               │
@@ -40,13 +40,12 @@ A GitHub Action that syncs issues from the [beads](https://github.com/steveyegge
 │                         Sync Engine                                 │
 ├─────────────────────────────────────────────────────────────────────┤
 │                                                                     │
-│  1. Parse beads/issues.jsonl                                       │
-│  2. Load mapping from .beads-sync/mapping.json                     │
-│  3. Diff current state vs GitHub Issues                            │
-│  4. Apply changes (create/update/close issues)                     │
-│  5. Sync comments (create new beads comments as GitHub comments)   │
-│  6. Update mapping file                                            │
-│  7. Commit mapping changes (if configured)                         │
+│  1. Parse .beads/issues.jsonl                                       │
+│  3. Diff current state vs GitHub Issues                             │
+│  4. Apply changes (create/update/close issues)                      │
+│  5. Sync comments (create new beads comments as GitHub comments)    │
+│  6. Update mapping file                                             │
+│  7. Commit mapping changes (if configured)                          │
 │                                                                     │
 └─────────────────────────────────────────────────────────────────────┘
 ```
@@ -57,7 +56,7 @@ A GitHub Action that syncs issues from the [beads](https://github.com/steveyegge
 
 ```
 1. Developer updates beads issue via `bd` CLI
-2. `bd` exports to beads/issues.jsonl
+2. `bd` exports to .beads/issues.jsonl
 3. Developer commits and pushes
 4. GitHub Action triggers on push
 5. Sync engine:
@@ -81,29 +80,7 @@ A GitHub Action that syncs issues from the [beads](https://github.com/steveyegge
 
 **Problem**: Beads uses hash IDs (`bd-a1b2`), GitHub uses sequential numbers.
 
-**Solution**: Maintain a mapping file `.beads-sync/mapping.json`:
-
-```json
-{
-  "version": 1,
-  "mappings": {
-    "bd-a1b2": {
-      "github_issue_number": 42,
-      "github_issue_id": 1234567890,
-      "last_sync_at": "2025-11-25T14:56:49Z",
-      "beads_updated_at": "2025-11-25T14:56:49Z",
-      "adopted_from_external_ref": false,
-      "comments": {
-        "1": { "github_comment_id": 9876543210 },
-        "2": { "github_comment_id": 9876543211 }
-      }
-    }
-  },
-  "sync_metadata": {
-    "last_full_sync": "2025-11-25T15:00:00Z"
-  }
-}
-```
+**Solution**: 
 
 **External Ref Handling**: If a beads issue has `external_ref: "gh-42"`, the syncer will:
 1. Parse the GitHub issue number from the ref
@@ -205,7 +182,7 @@ Auto-create labels if they don't exist:
 ### Phase 1: Core Sync Engine
 
 1. **Parser Module** (`src/parser.ts`)
-   - Read and parse `beads/issues.jsonl`
+   - Read and parse `.beads/issues.jsonl`
    - Validate issue schema
    - Handle malformed entries gracefully
 
@@ -298,8 +275,7 @@ beads-syncer/
     github-token: ${{ secrets.GITHUB_TOKEN }}
 
     # Optional - paths
-    beads-file: 'beads/issues.jsonl'         # Default
-    mapping-file: '.beads-sync/mapping.json' # Default
+    beads-file: '.beads/issues.jsonl'         # Default
 
     # Optional - sync behavior
     dry-run: false                           # Preview without making changes
@@ -314,10 +290,6 @@ beads-syncer/
     label-prefix: ''                         # Prefix for auto-created labels
     add-sync-marker: true                    # Add 'beads-synced' label
     close-deleted: true                      # Close GitHub issues when beads issue deleted
-
-    # Optional - mapping file commit
-    auto-commit-mapping: true                # Commit mapping file changes
-    commit-message: 'chore(beads-sync): update issue mapping'
 ```
 
 ## Security Considerations

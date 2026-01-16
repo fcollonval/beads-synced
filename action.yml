@@ -13,7 +13,7 @@ inputs:
   beads-file:
     description: 'Path to beads issues.jsonl file'
     required: false
-    default: 'beads/issues.jsonl'
+    default: '.beads/issues.jsonl'
   dry-run:
     description: 'Preview changes without applying'
     required: false

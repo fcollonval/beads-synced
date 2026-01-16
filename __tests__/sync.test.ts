@@ -34,7 +34,7 @@ describe('sync', () => {
 
   const makeConfig = (overrides: Partial<SyncConfig> = {}): SyncConfig => ({
     githubToken: 'test-token',
-    beadsFile: 'beads/issues.jsonl',
+    beadsFile: '.beads/issues.jsonl',
     dryRun: false,
     syncComments: false,
     syncStatuses: ['open', 'in_progress', 'blocked', 'closed'],

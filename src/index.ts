@@ -32,7 +32,7 @@ function getConfig(): SyncConfig {
 
   return {
     githubToken: core.getInput('github-token', { required: true }),
-    beadsFile: core.getInput('beads-file') || 'beads/issues.jsonl',
+    beadsFile: core.getInput('beads-file') || '.beads/issues.jsonl',
     dryRun: core.getInput('dry-run') === 'true',
     syncComments: core.getInput('sync-comments') !== 'false',
     syncStatuses,

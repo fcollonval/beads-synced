@@ -5,7 +5,7 @@ on:
     branches:
       - main
     paths:
-      - 'beads/issues.jsonl'
+      - '.beads/issues.jsonl'
   workflow_dispatch:
     inputs:
       dry-run:

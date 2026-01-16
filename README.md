@@ -23,7 +23,6 @@ name: Sync Beads to GitHub Issues
 on:
   push:
     branches: [main]
-    paths: ['beads/issues.jsonl']
   workflow_dispatch:
 
 permissions:
@@ -49,8 +48,7 @@ jobs:
 | Input | Description | Default |
 |-------|-------------|---------|
 | `github-token` | GitHub token for API access | **required** |
-| `beads-file` | Path to beads issues.jsonl file | `beads/issues.jsonl` |
-| `mapping-file` | Path to ID mapping file | `.beads-sync/mapping.json` |
+| `beads-file` | Path to beads issues.jsonl file | `.beads/issues.jsonl` |
 | `dry-run` | Preview changes without applying | `false` |
 | `sync-comments` | Sync beads comments to GitHub | `true` |
 | `sync-statuses` | Which statuses to sync (comma-separated) | `open,in_progress,blocked,closed` |
@@ -59,22 +57,18 @@ jobs:
 | `label-prefix` | Prefix for auto-created labels | `` |
 | `add-sync-marker` | Add `beads-synced` label to issues | `true` |
 | `close-deleted` | Close GitHub issues when beads issue deleted | `true` |
-| `auto-commit-mapping` | Commit mapping file changes | `true` |
-| `commit-message` | Commit message for mapping updates | `chore(beads-sync): update issue mapping` |
 
 ## How It Works
 
 ```
 beads/issues.jsonl  ──►  Sync Engine  ──►  GitHub Issues
-        │                     │                  │
-        │                     ▼                  │
-        │         .beads-sync/mapping.json       │
-        │         (beads ID ↔ GitHub #)          │
+        │                     │                   │
+        │                     ▼                   │
+        │         (beads ID ↔ GitHub #)           │
         └─────────────────────────────────────────┘
 ```
 
-1. Parse `beads/issues.jsonl`
-2. Load ID mapping from `.beads-sync/mapping.json`
+1. Parse `.beads/issues.jsonl`
 3. Compute diff (what needs to be created/updated/closed)
 4. Apply changes to GitHub Issues
 5. Sync new comments
