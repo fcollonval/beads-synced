@@ -22,7 +22,8 @@ name: Sync Beads to GitHub Issues
 
 on:
   push:
-    branches: [main]
+    branches: [beads-sync]  # Use the branch used for beads synchronization
+    paths: ['.beads/issues.jsonl']
   workflow_dispatch:
 
 permissions:
@@ -34,7 +35,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: mrf/beads-synced@v1
+      - uses: fcollonval/beads-synced@v1
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
 ```
