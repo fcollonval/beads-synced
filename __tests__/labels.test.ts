@@ -244,15 +244,21 @@ describe('labels', () => {
   });
 
   describe('getLabelsForIssue - beads ID label', () => {
-    it('should always include beads ID label', () => {
-      const labels = getLabelsForIssue(baseIssue, { addSyncMarker: false });
+    it('should include beads ID label', () => {
+      const labels = getLabelsForIssue(baseIssue, { addSyncMarker: false, setIdAsLabel: true });
       expect(labels).toContain('beads-id:bd-test');
+    });
+
+    it('should not include beads ID label', () => {
+      const labels = getLabelsForIssue(baseIssue, { addSyncMarker: false, setIdAsLabel: false });
+      expect(labels).not.toContain('beads-id:bd-test');
     });
 
     it('should include beads ID label with prefix', () => {
       const labels = getLabelsForIssue(baseIssue, {
         addSyncMarker: false,
         labelPrefix: 'myprefix-',
+        setIdAsLabel: true
       });
       expect(labels).toContain('myprefix-beads-id:bd-test');
     });
