@@ -522,9 +522,11 @@ function getConfig() {
     const syncLabels = labelsStr
         ? labelsStr.split(',').map((l) => l.trim())
         : [];
+    const userMappingBase = core.getInput('mapping-base');
+    const mappingBase = ['label', 'title'].includes(userMappingBase) ? userMappingBase : 'title';
     return {
         githubToken: core.getInput('github-token', { required: true }),
-        beadsFile: core.getInput('beads-file') || 'beads/issues.jsonl',
+        beadsFile: core.getInput('beads-file') || '.beads/issues.jsonl',
         dryRun: core.getInput('dry-run') === 'true',
         syncComments: core.getInput('sync-comments') !== 'false',
         syncStatuses,
@@ -533,6 +535,7 @@ function getConfig() {
         labelPrefix: core.getInput('label-prefix') || '',
         addSyncMarker: core.getInput('add-sync-marker') !== 'false',
         closeDeleted: core.getInput('close-deleted') !== 'false',
+        mappingBase,
         owner,
         repo,
     };
@@ -592,7 +595,7 @@ async function run() {
         core.info(`Fetching existing synced issues with label: ${syncMarkerLabel}`);
         const existingIssues = await client.listIssuesByLabel(syncMarkerLabel);
         core.info(`Found ${existingIssues.length} existing synced issues`);
-        const mapping = (0, mapper_1.buildMappingFromGitHubIssues)(existingIssues, config.labelPrefix);
+        const mapping = (0, mapper_1.buildMappingFromGitHubIssues)(existingIssues, config.labelPrefix, config.mappingBase);
         core.info(`Built mapping with ${Object.keys(mapping.mappings).length} entries`);
         // Run sync
         const result = await (0, sync_1.runSync)(parseResult.issues, mapping, client, config);
@@ -652,7 +655,9 @@ function getLabelsForIssue(issue, options) {
         labels.push(`${prefix}${types_1.SYNC_MARKER_LABEL.name}`);
     }
     // Beads ID label - always add to track the mapping
-    labels.push(getBeadsIdLabel(issue.id, prefix));
+    if (options.setIdAsLabel) {
+        labels.push(getBeadsIdLabel(issue.id, prefix));
+    }
     // Priority label
     if (issue.priority !== undefined) {
         const priorityLabel = types_1.PRIORITY_LABELS[issue.priority];
@@ -803,14 +808,24 @@ function createEmptyMapping() {
         },
     };
 }
+const ID_REGEXP = /^\[([\w-]+)\].*/;
+/**
+ * Extract the beads ID assuming issue title format '[<beads id>] <issue title>'
+ *
+ * @param title Issue title
+ * @returns Beads ID or undefined
+ */
+function extractBeadsIdFromTitle(title) {
+    return (ID_REGEXP.exec(title) ?? [])[1];
+}
 /**
  * Build a mapping from GitHub issues by extracting beads IDs from labels
  * This replaces the need for a persistent mapping file
  */
-function buildMappingFromGitHubIssues(issues, labelPrefix = '') {
+function buildMappingFromGitHubIssues(issues, labelPrefix = '', mappingBase = 'title') {
     const mapping = createEmptyMapping();
     for (const issue of issues) {
-        const beadsId = (0, labels_1.extractBeadsIdFromLabels)(issue.labels, labelPrefix);
+        const beadsId = mappingBase === 'label' ? (0, labels_1.extractBeadsIdFromLabels)(issue.labels, labelPrefix) : extractBeadsIdFromTitle(issue.title);
         if (beadsId) {
             mapping.mappings[beadsId] = {
                 github_issue_number: issue.number,
@@ -1085,12 +1100,14 @@ async function executeAction(action, mapping, client, config) {
         const labels = (0, labels_1.getLabelsForIssue)(beadsIssue, {
             addSyncMarker: config.addSyncMarker,
             labelPrefix: config.labelPrefix,
+            setIdAsLabel: config.mappingBase === 'label'
         });
         // Validate and filter assignees
         let assignees = [];
         if (beadsIssue.assignee) {
             assignees = await client.filterValidAssignees([beadsIssue.assignee]);
         }
+        const title = config.mappingBase === 'title' ? `[${beadsIssue.id}] ${beadsIssue.title}` : beadsIssue.title;
         switch (action.type) {
             case 'create': {
                 if (config.dryRun) {
@@ -1098,7 +1115,7 @@ async function executeAction(action, mapping, client, config) {
                     return null;
                 }
                 const created = await client.createIssue({
-                    title: beadsIssue.title,
+                    title,
                     body,
                     labels,
                     assignees,
@@ -1120,7 +1137,7 @@ async function executeAction(action, mapping, client, config) {
                 }
                 await client.updateIssue({
                     issueNumber: action.githubIssueNumber,
-                    title: beadsIssue.title,
+                    title,
                     body,
                     labels,
                     assignees,
@@ -1142,7 +1159,7 @@ async function executeAction(action, mapping, client, config) {
                 // Also update the body before closing
                 await client.updateIssue({
                     issueNumber: action.githubIssueNumber,
-                    title: beadsIssue.title,
+                    title,
                     body,
                     labels,
                 });
@@ -1174,7 +1191,7 @@ async function executeAction(action, mapping, client, config) {
                 // Update the issue with beads content
                 await client.updateIssue({
                     issueNumber: action.githubIssueNumber,
-                    title: beadsIssue.title,
+                    title,
                     body,
                     labels,
                     assignees,
@@ -1199,7 +1216,7 @@ async function executeAction(action, mapping, client, config) {
                 await client.reopenIssue(action.githubIssueNumber);
                 await client.updateIssue({
                     issueNumber: action.githubIssueNumber,
-                    title: beadsIssue.title,
+                    title,
                     body,
                     labels,
                     assignees,
@@ -1404,7 +1421,7 @@ ${issue.notes}
     if (issue.dependencies && issue.dependencies.length > 0) {
         const depStrings = issue.dependencies.map((dep) => {
             const depMapping = (0, mapper_1.getMapping)(mapping, dep.id);
-            if (depMapping) {
+            if (depMapping?.github_issue_number !== undefined) {
                 return `#${depMapping.github_issue_number} (${dep.type})`;
             }
             return `${dep.id} (${dep.type})`;
