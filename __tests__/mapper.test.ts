@@ -258,7 +258,7 @@ describe('mapper', () => {
     it('should skip issues without beads ID in title', () => {
       const issues = [
         makeGitHubIssue(1, ['beads-synced', 'beads-id:bd-abc123'], 'bd-abc123'),
-        makeGitHubIssue(2, ['beads-synced', 'type:bug']), // No beads-id label
+        makeGitHubIssue(2, ['beads-synced', 'type:bug']), // No beads-id in title
         makeGitHubIssue(3, ['random-label']), // Not a synced issue
       ];
 
