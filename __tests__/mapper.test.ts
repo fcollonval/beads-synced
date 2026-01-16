@@ -191,12 +191,13 @@ describe('mapper', () => {
     const makeGitHubIssue = (
       number: number,
       labels: string[],
-      state: 'open' | 'closed' = 'open'
+      beadsId: string = '',
+      state: 'open' | 'closed' = 'open',
     ): GitHubIssue => ({
       number,
       id: number * 100,
       state,
-      title: `Issue ${number}`,
+      title: `${beadsId ? '[' + beadsId + '] ' : ''}Issue ${number}`,
       body: null,
       labels,
     });
@@ -213,7 +214,7 @@ describe('mapper', () => {
         makeGitHubIssue(2, ['beads-synced', 'beads-id:bd-xyz789', 'priority:p1']),
       ];
 
-      const mapping = buildMappingFromGitHubIssues(issues);
+      const mapping = buildMappingFromGitHubIssues(issues, undefined, 'label');
 
       expect(getMapping(mapping, 'bd-abc123')).toBeDefined();
       expect(getMapping(mapping, 'bd-abc123')?.github_issue_number).toBe(1);
@@ -231,6 +232,36 @@ describe('mapper', () => {
         makeGitHubIssue(3, ['random-label']), // Not a synced issue
       ];
 
+      const mapping = buildMappingFromGitHubIssues(issues, undefined, 'label');
+
+      expect(getMappedBeadsIds(mapping)).toHaveLength(1);
+      expect(getMapping(mapping, 'bd-abc123')).toBeDefined();
+    });
+
+    it('should extract beads ID from title and create mapping', () => {
+      const issues = [
+        makeGitHubIssue(1, ['beads-synced', 'beads-id:bd-abc123', 'type:bug'], 'bd-abc123'),
+        makeGitHubIssue(2, ['beads-synced', 'beads-id:bd-xyz789', 'priority:p1'], 'bd-xyz789'),
+      ];
+
+      const mapping = buildMappingFromGitHubIssues(issues);
+
+      expect(getMapping(mapping, 'bd-abc123')).toBeDefined();
+      expect(getMapping(mapping, 'bd-abc123')?.github_issue_number).toBe(1);
+      expect(getMapping(mapping, 'bd-abc123')?.github_issue_id).toBe(100);
+
+      expect(getMapping(mapping, 'bd-xyz789')).toBeDefined();
+      expect(getMapping(mapping, 'bd-xyz789')?.github_issue_number).toBe(2);
+      expect(getMapping(mapping, 'bd-xyz789')?.github_issue_id).toBe(200);
+    });
+
+    it('should skip issues without beads ID in title', () => {
+      const issues = [
+        makeGitHubIssue(1, ['beads-synced', 'beads-id:bd-abc123'], 'bd-abc123'),
+        makeGitHubIssue(2, ['beads-synced', 'type:bug']), // No beads-id label
+        makeGitHubIssue(3, ['random-label']), // Not a synced issue
+      ];
+
       const mapping = buildMappingFromGitHubIssues(issues);
 
       expect(getMappedBeadsIds(mapping)).toHaveLength(1);
@@ -242,7 +273,7 @@ describe('mapper', () => {
         makeGitHubIssue(1, ['myprefix-beads-synced', 'myprefix-beads-id:bd-prefixed']),
       ];
 
-      const mapping = buildMappingFromGitHubIssues(issues, 'myprefix-');
+      const mapping = buildMappingFromGitHubIssues(issues, 'myprefix-', 'label');
 
       expect(getMapping(mapping, 'bd-prefixed')).toBeDefined();
       expect(getMapping(mapping, 'bd-prefixed')?.github_issue_number).toBe(1);
@@ -254,7 +285,7 @@ describe('mapper', () => {
         makeGitHubIssue(2, ['beads-synced', 'beads-id:bd-closed'], 'closed'),
       ];
 
-      const mapping = buildMappingFromGitHubIssues(issues);
+      const mapping = buildMappingFromGitHubIssues(issues, undefined, 'label');
 
       expect(getMapping(mapping, 'bd-open')).toBeDefined();
       expect(getMapping(mapping, 'bd-closed')).toBeDefined();
@@ -263,7 +294,7 @@ describe('mapper', () => {
     it('should set beads_updated_at to epoch to trigger update', () => {
       const issues = [makeGitHubIssue(1, ['beads-id:bd-test'])];
 
-      const mapping = buildMappingFromGitHubIssues(issues);
+      const mapping = buildMappingFromGitHubIssues(issues, undefined, 'label');
 
       expect(getMapping(mapping, 'bd-test')?.beads_updated_at).toBe('1970-01-01T00:00:00Z');
     });
