@@ -30,6 +30,9 @@ function getConfig(): SyncConfig {
     ? labelsStr.split(',').map((l) => l.trim())
     : [];
 
+  const userMappingBase = core.getInput('mapping-base')
+  const mappingBase = ['label', 'title'].includes(userMappingBase) ? userMappingBase as 'label' | 'title' : 'title';
+
   return {
     githubToken: core.getInput('github-token', { required: true }),
     beadsFile: core.getInput('beads-file') || '.beads/issues.jsonl',
@@ -41,6 +44,7 @@ function getConfig(): SyncConfig {
     labelPrefix: core.getInput('label-prefix') || '',
     addSyncMarker: core.getInput('add-sync-marker') !== 'false',
     closeDeleted: core.getInput('close-deleted') !== 'false',
+    mappingBase,
     owner,
     repo,
   };
@@ -109,7 +113,7 @@ async function run(): Promise<void> {
     const existingIssues = await client.listIssuesByLabel(syncMarkerLabel);
     core.info(`Found ${existingIssues.length} existing synced issues`);
 
-    const mapping = buildMappingFromGitHubIssues(existingIssues, config.labelPrefix);
+    const mapping = buildMappingFromGitHubIssues(existingIssues, config.labelPrefix, config.mappingBase);
     core.info(`Built mapping with ${Object.keys(mapping.mappings).length} entries`);
 
     // Run sync

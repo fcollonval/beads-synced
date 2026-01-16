@@ -14,6 +14,7 @@ import {
 export interface LabelOptions {
   addSyncMarker: boolean;
   labelPrefix?: string;
+  setIdAsLabel: boolean;
 }
 
 /**
@@ -32,7 +33,9 @@ export function getLabelsForIssue(
   }
 
   // Beads ID label - always add to track the mapping
-  labels.push(getBeadsIdLabel(issue.id, prefix));
+  if (options.setIdAsLabel) {
+    labels.push(getBeadsIdLabel(issue.id, prefix));
+  }
 
   // Priority label
   if (issue.priority !== undefined) {

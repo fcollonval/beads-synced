@@ -15,18 +15,31 @@ export function createEmptyMapping(): MappingFile {
   };
 }
 
+const ID_REGEXP = /^\[([\w-]+)\].*/;
+
+/**
+ * Extract the beads ID assuming issue title format '[<beads id>] <issue title>'
+ *
+ * @param title Issue title
+ * @returns Beads ID or undefined
+ */
+function extractBeadsIdFromTitle(title: string): string | undefined {
+  return (ID_REGEXP.exec(title) ?? [])[1]
+}
+
 /**
  * Build a mapping from GitHub issues by extracting beads IDs from labels
  * This replaces the need for a persistent mapping file
  */
 export function buildMappingFromGitHubIssues(
   issues: GitHubIssue[],
-  labelPrefix: string = ''
+  labelPrefix: string = '',
+  mappingBase: 'label' | 'title' = 'title'
 ): MappingFile {
   const mapping = createEmptyMapping();
 
   for (const issue of issues) {
-    const beadsId = extractBeadsIdFromLabels(issue.labels, labelPrefix);
+    const beadsId = mappingBase === 'label' ? extractBeadsIdFromLabels(issue.labels, labelPrefix) : extractBeadsIdFromTitle(issue.title);
     if (beadsId) {
       mapping.mappings[beadsId] = {
         github_issue_number: issue.number,

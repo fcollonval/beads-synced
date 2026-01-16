@@ -46,6 +46,10 @@ inputs:
     description: 'Close GitHub issues when beads issue is deleted'
     required: false
     default: 'true'
+  mapping-base:
+    description: 'Where is the beads id stored? one of [label, title]'
+    required: false
+    default: 'title'
 
 outputs:
   created:

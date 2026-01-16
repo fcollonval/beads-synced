@@ -109,6 +109,7 @@ export interface SyncConfig {
   labelPrefix: string;
   addSyncMarker: boolean;
   closeDeleted: boolean;
+  mappingBase: 'label' | 'title',
   owner: string;
   repo: string;
 }

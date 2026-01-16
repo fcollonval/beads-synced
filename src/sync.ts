@@ -71,6 +71,7 @@ async function executeAction(
     const labels = getLabelsForIssue(beadsIssue, {
       addSyncMarker: config.addSyncMarker,
       labelPrefix: config.labelPrefix,
+      setIdAsLabel: config.mappingBase === 'label'
     });
 
     // Validate and filter assignees
@@ -78,6 +79,8 @@ async function executeAction(
     if (beadsIssue.assignee) {
       assignees = await client.filterValidAssignees([beadsIssue.assignee]);
     }
+
+    const title = config.mappingBase === 'title' ? `[${beadsIssue.id}] ${beadsIssue.title}` : beadsIssue.title;
 
     switch (action.type) {
       case 'create': {
@@ -87,7 +90,7 @@ async function executeAction(
         }
 
         const created = await client.createIssue({
-          title: beadsIssue.title,
+          title,
           body,
           labels,
           assignees,
@@ -124,7 +127,7 @@ async function executeAction(
 
         await client.updateIssue({
           issueNumber: action.githubIssueNumber!,
-          title: beadsIssue.title,
+          title,
           body,
           labels,
           assignees,
@@ -154,7 +157,7 @@ async function executeAction(
         // Also update the body before closing
         await client.updateIssue({
           issueNumber: action.githubIssueNumber!,
-          title: beadsIssue.title,
+          title,
           body,
           labels,
         });
@@ -196,7 +199,7 @@ async function executeAction(
         // Update the issue with beads content
         await client.updateIssue({
           issueNumber: action.githubIssueNumber!,
-          title: beadsIssue.title,
+          title,
           body,
           labels,
           assignees,
@@ -238,7 +241,7 @@ async function executeAction(
         await client.reopenIssue(action.githubIssueNumber!);
         await client.updateIssue({
           issueNumber: action.githubIssueNumber!,
-          title: beadsIssue.title,
+          title,
           body,
           labels,
           assignees,
@@ -366,8 +369,8 @@ export async function runSync(
   const diff = computeDiff(filteredIssues, mapping);
   core.info(
     `Diff: ${diff.actions.length} actions, ` +
-      `${diff.commentActions.length} comments, ` +
-      `${diff.deletedIssueIds.length} deletions`
+    `${diff.commentActions.length} comments, ` +
+    `${diff.deletedIssueIds.length} deletions`
   );
 
   // Execute actions
